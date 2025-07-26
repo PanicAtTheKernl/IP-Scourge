@@ -4,7 +4,7 @@
 
 ## Disclaimer
 
-Use IP-Scourge responsibly. **PanicAtTheKernl** is not liable for misuse, such as griefing or disrupting servers. Scan and join only servers you’re permitted to, and always be respectful—don’t ruin anyone’s game.
+Use IP-Scourge responsibly. **PanicAtTheKernl** is not liable for misuse, such as griefing or disrupting servers. Scan and join only servers you’re permitted to, and always be respectful. Don’t ruin anyone’s fun!
 
 ## Features
 
