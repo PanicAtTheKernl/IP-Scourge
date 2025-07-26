@@ -76,4 +76,3 @@ Contributions are welcome! Please submit a pull request or open an issue on [Git
 ## Disclaimer
 
 Use responsibly and respect server operators. Scanning large IP ranges may violate terms of service of some networks or hosting providers.
-```
