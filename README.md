@@ -1,118 +1,159 @@
-# IP-Scourge: Minecraft Server Scanner
+```text
+░▒▓█▓▒░▒▓███████▓▒░        ░▒▓███████▓▒░░▒▓██████▓▒░ ░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓███████▓▒░ ░▒▓██████▓▒░░▒▓████████▓▒░ 
+░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░        
+░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░        
+░▒▓█▓▒░▒▓███████▓▒░        ░▒▓██████▓▒░░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓███████▓▒░░▒▓█▓▒▒▓███▓▒░▒▓██████▓▒░   
+░▒▓█▓▒░▒▓█▓▒░                    ░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░        
+░▒▓█▓▒░▒▓█▓▒░                    ░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░        
+░▒▓█▓▒░▒▓█▓▒░             ░▒▓███████▓▒░ ░▒▓██████▓▒░ ░▒▓██████▓▒░ ░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░░▒▓██████▓▒░░▒▓████████▓▒░ 
+```
 
-**IP-Scourge**, created by **PanicAtTheKernl**, is a Python-based tool for scanning Minecraft servers across IP ranges commonly used by hosting providers. Using asynchronous I/O, it efficiently detects servers, their status, player counts, MOTDs, whitelists, and online player names. Ideal for server admins or Minecraft enthusiasts exploring servers respectfully.
+# 🧠 IP-Scourge
 
-## Disclaimer
+Welcome to **IP-Scourge**, the Python script your firewall warned you about.
 
-Use IP-Scourge responsibly. **PanicAtTheKernl** is not liable for misuse, such as griefing or disrupting servers. Scan and join only servers you’re permitted to, and always be respectful. Don’t ruin anyone’s fun!
+This unholy creation scans the internet for Minecraft servers like a deranged archaeologist with a pickaxe and no moral compass. It’s fast, it’s dirty, and it’s probably doing things Mojang would rather you didn’t. But hey—if they didn’t want us poking around, they shouldn’t have made the protocol so deliciously scrutable.
 
-## Features
+---
 
-- Asynchronous scanning with Python’s `asyncio` for high performance.
-- Detects server version, player counts, MOTD, whitelist status, and online player names.
-- Targets IP ranges from providers like Hetzner, OVH, DigitalOcean, AWS, Vultr, and Linode.
-- Saves results to `found_servers.json` with scan statistics.
-- Configurable concurrency, timeout, and port settings.
-- Optional CPU monitoring with `psutil` for system performance insights.
-- Progress monitoring with real-time scan statistics.
+## 🚀 What It Does (aka Why You’re Here)
 
-## Prerequisites
+- 🧠 Uses `asyncio` to scan IPs faster than your caffeine-addled brain can comprehend
+- 🕵️‍♂️ Digs up:
+  - Server version
+  - Player counts
+  - MOTD (Message of the Day, or “please don’t DDoS us”)
+  - Whitelist status
+  - Online player names (yes, we see you, xXx_420Sniper_xXx)
+- 🌍 Targets IP ranges from big-boy hosts like Hetzner, OVH, AWS, etc.
+- 📦 Dumps results into `found_servers.json` like a good little data goblin
+- 🛠️ Configurable concurrency, timeout, and port settings
+- 🧮 Optional CPU monitoring via `psutil` (because your laptop is crying)
+- 📊 Real-time progress updates so you can feel like a hacker in a bad movie
 
-- **Python 3.8+**: Install via Linux package managers (`sudo apt install python3`, `sudo dnf install python3`, `sudo pacman -S python`) or from [python.org](https://www.python.org/downloads/). You’ve got this covered.
-- **Git**: For cloning the repository.
-- **Optional**: `psutil` for CPU monitoring (`pip install psutil`). If not installed, CPU monitoring is disabled.
+---
 
-## Installation
+## 💬 NEW: Discord Integration
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/PanicAtTheKernl/IP-Scourge.git
-   cd IP-Scourge
-   ```
+Because what’s better than scanning the internet for Minecraft servers?  
+**Bragging about it in Discord.**
 
-2. Install optional dependency (if desired):
-   ```bash
-   pip install psutil
-   ```
+Use the companion script:  
+**`ip-scourge-discord-integration.py`**
 
-3. No other dependencies required—runs on Python’s standard library.
+### 🔧 Setup
 
-## Usage
+1. Open the file
+2. Paste in your Discord bot token and channel IDs
+3. Run it and bask in the glory of automated server spam
+4. Watch your Discord channel fill with juicy server data
 
-1. Run the scanner:
-   ```bash
-   python ip-scourge.py
-   ```
-   Scans IP ranges (1000 samples per range by default) and saves results to `found_servers.json`. Output includes server IP, port, version, player counts, MOTD, whitelist status, player names, and timestamp.
+> 🧌 Perfect for flexing, monitoring, or summoning your fellow gremlins
 
-2. Customize settings in `ip-scourge.py` under the `main()` function:
-   ```python
-   scanner = MinecraftServerScanner(
-       max_concurrent=100,  # Max concurrent scans (reduce if connection errors occur)
-       timeout=3.0,        # Scan timeout in seconds (increase for slower networks)
-       port=25565          # Minecraft server port
-   )
-   ```
-   Adjust `samples_per_range` in `scan_ranges(samples_per_range=1000)` for more or fewer IPs per range.
+---
 
-3. View results in `found_servers.json`, which includes scan statistics and server details. Console output shows real-time progress and server info, including up to 5 player names per server.
+## 📦 Installation
 
-## API Reference
+### Requirements
 
-### `MinecraftProtocol` Class
-Handles Minecraft protocol operations.
+- Python 3.8+
+- Git
+- Optional: `psutil` for CPU stats
 
-- `pack_varint(value: int) -> bytes`: Encodes an integer as a varint.
-- `unpack_varint(reader: asyncio.StreamReader, max_bytes: int = 5) -> int`: Decodes a varint from a stream.
-- `pack_string(text: str) -> bytes`: Encodes a string with a varint length prefix (up to 32,767 bytes).
-- `create_handshake_packet(host: str, port: int) -> bytes`: Creates a handshake and status request packet (protocol version 47, Minecraft 1.8.x).
+### Setup
 
-### `MinecraftServerScanner` Class
-Manages the scanning process.
+```bash
+git clone https://github.com/PanicAtTheKernl/IP-Scourge.git
+cd IP-Scourge
+pip install -r requirements.txt
+```
 
-- `__init__(max_concurrent: int = 100, timeout: float = 3.0, port: int = 25565)`: Initializes with concurrency, timeout, and port settings.
-- `get_target_ip_ranges() -> List[str]`: Returns IP ranges from hosting providers (e.g., Hetzner, OVH, AWS).
-- `generate_random_ips(ip_ranges: List[str], samples_per_range: int = 500) -> List[str]`: Generates random IPs from specified ranges.
-- `ping_minecraft_server(ip: str) -> Optional[ServerResult]`: Pings a server, returning a `ServerResult` with version, player counts, MOTD, whitelist status, and player names.
-- `scan_ip(ip: str) -> Optional[ServerResult]`: Scans an IP with concurrency control and logs results.
-- `save_results()`: Saves results to `found_servers.json` every 50 successful scans.
-- `progress_monitor(total_targets: int)`: Displays scan progress (percentage, rate, found servers).
-- `scan_ranges(samples_per_range: int = 500)`: Runs the full scan, targeting specified IP ranges.
+---
 
-### `ServerResult` Dataclass
-Stores server information:
-- `ip: str`: Server IP address.
-- `port: int`: Server port.
-- `version: str`: Server version (e.g., "1.8.x").
-- `players_online: int`: Current player count.
-- `players_max: int`: Maximum player capacity.
-- `motd: str`: Message of the Day (up to 200 characters).
-- `whitelisted: bool`: Whether the server appears whitelisted (based on MOTD or player limits).
-- `player_names: List[str]`: List of online player names.
-- `timestamp: float`: Scan timestamp.
+## 🕹️ Usage
 
-## Contributing
+Run the main scanner:
 
-Want to improve IP-Scourge? Contributions are welcome:
+```bash
+python ip-scourge.py
+```
 
-1. Fork the repository: [github.com/PanicAtTheKernl/IP-Scourge](https://github.com/PanicAtTheKernl/IP-Scourge).
-2. Create a branch:
-   ```bash
-   git checkout -b your-feature
-   ```
-3. Commit and push changes:
-   ```bash
-   git commit -m "Your changes"
-   git push origin your-feature
-   ```
-4. Open a pull request.
+Customize stuff in `ip-scourge.py`:
 
-Report issues or suggestions at [GitHub Issues](https://github.com/PanicAtTheKernl/IP-Scourge/issues).
+```python
+scanner = MinecraftServerScanner(
+    max_concurrent=100,  # Lower if your router starts sobbing
+    timeout=3.0,         # Raise if you live in a potato-powered village
+    port=25565           # Minecraft default, but you do you
+)
+```
 
-## License
+Adjust `samples_per_range` in `scan_ranges()` to control how many IPs get violated per host.
 
-Licensed under the [MIT License](LICENSE).
+Results go to `found_servers.json`, which you can open in your favorite JSON viewer or sacrifice to a data god.
 
-## Contact
+---
 
-Questions or feedback? Open an issue on [GitHub](https://github.com/PanicAtTheKernl/IP-Scourge).
+## 🧪 API Reference (for Nerds)
+
+### `MinecraftProtocol`
+Handles Minecraft protocol magic:
+- `pack_varint(value: int)`
+- `unpack_varint(reader)`
+- `pack_string(text)`
+- `create_handshake_packet(host, port)`
+
+### `MinecraftServerScanner`
+Does the actual dirty work:
+- `get_target_ip_ranges()`
+- `generate_random_ips()`
+- `ping_minecraft_server(ip)`
+- `scan_ip(ip)`
+- `save_results()`
+- `progress_monitor()`
+- `scan_ranges()`
+
+### `ServerResult`
+Stores server info like a digital trophy case:
+
+```python
+ServerResult(
+    ip: str,
+    port: int,
+    version: str,
+    players_online: int,
+    players_max: int,
+    motd: str,
+    whitelisted: bool,
+    player_names: List[str],
+    timestamp: float
+)
+```
+
+---
+
+## 🤝 Contributing
+
+Feel like making this worse? Better? More cursed?
+
+1. Fork the repo  
+2. Make your changes  
+3. Open a pull request  
+4. Wait for approval or divine intervention  
+5. Or just scream into the GitHub Issues void
+
+---
+
+## 📜 License
+
+MIT. Basically: do what you want, just don’t be a jerk.
+
+---
+
+## 🧩 About
+
+Made by [PanicAtTheKernl](https://github.com/PanicAtTheKernl), IP-Scourge is a love letter to Minecraft, Python, and the thrill of poking things you probably shouldn’t.
+
+---
+
+> “If scanning IPs is wrong, I don’t want to be right.” – Probably you, after running this
