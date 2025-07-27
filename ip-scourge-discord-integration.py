@@ -24,6 +24,7 @@ import aiohttp
 from datetime import datetime
 import traceback
 import gc
+import signal
 
 # Enhanced logging setup with file rotation
 def setup_logging():
@@ -69,9 +70,9 @@ def setup_logging():
 logger = setup_logging()
 
 # Discord Bot Config (change these!)
-DISCORD_BOT_TOKEN = "DISCORD BOT TOKEN HERE"
-DISCORD_CHANNEL_ID = DISCORDD CHANNEL ID HERE
-DISCORD_LOG_CHANNEL_ID = DISCORD LOGGING CHANNEL ID HERE
+DISCORD_BOT_TOKEN = "PASTE BOT TOKEN HERE"
+DISCORD_CHANNEL_ID = CHANNEL ID HERE
+DISCORD_LOG_CHANNEL_ID = LOGGING CHANNEL ID HERE
 
 @dataclass
 class ServerResult:
@@ -157,6 +158,13 @@ class DiscordLogger:
         self.token = token
         self.results_channel_id = results_channel_id
         self.log_channel_id = log_channel_id
+        self.session = None
+        self.message_queue = asyncio.Queue(maxsize=100)
+        self.log_queue = asyncio.Queue(maxsize=50)
+        self.rate_limiter = asyncio.Semaphore(5)
+        
+    async def initialize(self):
+        """Initialize the Discord logger session"""
         connector = aiohttp.TCPConnector(
             limit=50,
             limit_per_host=10,
@@ -169,12 +177,11 @@ class DiscordLogger:
             connector=connector,
             timeout=aiohttp.ClientTimeout(total=10)
         )
-        self.message_queue = asyncio.Queue(maxsize=100)
-        self.log_queue = asyncio.Queue(maxsize=50)
-        self.rate_limiter = asyncio.Semaphore(5)  # Discord rate limiting
         
     async def start_workers(self):
         """Start background workers for message sending"""
+        if not self.session:
+            await self.initialize()
         asyncio.create_task(self._message_worker())
         asyncio.create_task(self._log_worker())
         logger.info("Discord workers started")
@@ -205,6 +212,9 @@ class DiscordLogger:
 
     async def _send_to_channel(self, channel_id: int, content: str):
         """Send message to specific Discord channel"""
+        if not self.session:
+            return
+            
         async with self.rate_limiter:
             url = f"https://discord.com/api/v10/channels/{channel_id}/messages"
             payload = {"content": content[:2000]}  # Discord message limit
@@ -241,7 +251,8 @@ class DiscordLogger:
         await self.message_queue.put(None)  # Shutdown signal
         await self.log_queue.put(None)  # Shutdown signal
         await asyncio.sleep(2)  # Give workers time to finish
-        await self.session.close()
+        if self.session:
+            await self.session.close()
 
 class SystemMonitor:
     def __init__(self, discord_logger: DiscordLogger):
@@ -359,10 +370,6 @@ class MinecraftServerScanner:
         self.save_interval = 20
         self.discord = DiscordLogger(DISCORD_BOT_TOKEN, DISCORD_CHANNEL_ID, DISCORD_LOG_CHANNEL_ID)
         self.system_monitor = SystemMonitor(self.discord)
-        
-        # Connection pooling for better performance
-        self.connection_pool = {}
-        self.pool_lock = asyncio.Lock()
 
     def get_target_ip_ranges(self) -> List[str]:
         """Enhanced IP ranges with better targeting"""
@@ -514,291 +521,7 @@ class MinecraftServerScanner:
             self.stats['error_count'] += 1
             return None
         finally:
-            logger.info("🔄 Cleaning up...")
-        
-        # Final cleanup
-        try:
-            # Force close any remaining connections
-            for task in asyncio.all_tasks():
-                if not task.done():
-                    task.cancel()
-            
-            # Wait a bit for tasks to cleanup
-            await asyncio.sleep(1)
-            
-        except Exception as e:
-            logger.error(f"Cleanup error: {e}")
-
-def print_banner():
-    """Print startup banner"""
-    banner = """
-╔═══════════════════════════════════════════════════════════════╗
-║                     IP-SCOURGE ENHANCED                      ║
-║               High-Performance Minecraft Scanner             ║
-║                    With System Monitoring                    ║
-╠═══════════════════════════════════════════════════════════════╣
-║  GitHub: https://github.com/PanicAtTheKernl/IP-Scourge      ║
-║  License: MIT                                                ║
-╚═══════════════════════════════════════════════════════════════╝
-    """
-    print(banner)
-    logger.info("IP-Scourge Enhanced initialized")
-
-def check_dependencies():
-    """Check if all required dependencies are installed"""
-    required_modules = ['psutil', 'aiohttp']
-    missing = []
-    
-    for module in required_modules:
-        try:
-            __import__(module)
-        except ImportError:
-            missing.append(module)
-    
-    if missing:
-        logger.error(f"Missing required modules: {', '.join(missing)}")
-        logger.error("Please install with: pip install " + " ".join(missing))
-        sys.exit(1)
-    
-    logger.info("✅ All dependencies satisfied")
-
-def setup_directories():
-    """Create necessary directories"""
-    directories = ['logs', 'backups', 'results']
-    for directory in directories:
-        os.makedirs(directory, exist_ok=True)
-        logger.debug(f"Directory ensured: {directory}/")
-
-async def test_discord_connection(discord_logger):
-    """Test Discord bot connection"""
-    try:
-        await discord_logger.send_log("🧪 **Connection Test** - IP-Scourge Enhanced is online!")
-        logger.info("✅ Discord connection test successful")
-        return True
-    except Exception as e:
-        logger.error(f"❌ Discord connection failed: {e}")
-        logger.warning("Continuing without Discord logging...")
-        return False
-
-class ConfigManager:
-    """Configuration management class"""
-    def __init__(self):
-        self.config_file = "config.json"
-        self.default_config = {
-            "scanning": {
-                "max_concurrent": 250,
-                "timeout": 1.2,
-                "port": 25565,
-                "samples_per_range": 5000,
-                "save_interval": 20
-            },
-            "discord": {
-                "enable_logging": True,
-                "results_channel_id": DISCORD_CHANNEL_ID,
-                "log_channel_id": DISCORD_LOG_CHANNEL_ID,
-                "bot_token": DISCORD_BOT_TOKEN
-            },
-            "monitoring": {
-                "system_stats_interval": 30,
-                "progress_report_interval": 60,
-                "enable_terminal_stats": True
-            },
-            "output": {
-                "results_file": "found_servers.json",
-                "backup_results": True,
-                "log_level": "INFO"
-            }
-        }
-    
-    def load_config(self):
-        """Load configuration from file or create default"""
-        try:
-            if os.path.exists(self.config_file):
-                with open(self.config_file, 'r') as f:
-                    config = json.load(f)
-                logger.info(f"Configuration loaded from {self.config_file}")
-                return config
-            else:
-                self.save_config(self.default_config)
-                logger.info(f"Default configuration created at {self.config_file}")
-                return self.default_config
-        except Exception as e:
-            logger.error(f"Error loading config: {e}")
-            return self.default_config
-    
-    def save_config(self, config):
-        """Save configuration to file"""
-        try:
-            with open(self.config_file, 'w', encoding='utf-8') as f:
-                json.dump(config, f, indent=4, ensure_ascii=False)
-        except Exception as e:
-            logger.error(f"Error saving config: {e}")
-
-async def main():
-    """Main execution function with enhanced startup"""
-    try:
-        # Print banner and setup
-        print_banner()
-        check_dependencies()
-        setup_directories()
-        
-        # Load configuration
-        config_manager = ConfigManager()
-        config = config_manager.load_config()
-        
-        logger.info("🎮 IP-Scourge Enhanced - Starting up...")
-        
-        # System information
-        cpu_count = psutil.cpu_count()
-        memory_gb = psutil.virtual_memory().total / (1024**3)
-        disk_free_gb = psutil.disk_usage('.').free / (1024**3)
-        
-        logger.info(f"💻 System Information:")
-        logger.info(f"   CPU Cores: {cpu_count}")
-        logger.info(f"   Total RAM: {memory_gb:.1f}GB")
-        logger.info(f"   Free Disk: {disk_free_gb:.1f}GB")
-        
-        # Auto-tune settings based on system specs and config
-        scanning_config = config.get('scanning', {})
-        
-        if memory_gb >= 16 and cpu_count >= 8:
-            max_concurrent = scanning_config.get('max_concurrent', 300)
-            samples_per_range = scanning_config.get('samples_per_range', 6000)
-            timeout = scanning_config.get('timeout', 1.0)
-        elif memory_gb >= 8 and cpu_count >= 4:
-            max_concurrent = scanning_config.get('max_concurrent', 200)
-            samples_per_range = scanning_config.get('samples_per_range', 4000)
-            timeout = scanning_config.get('timeout', 1.2)
-        else:
-            max_concurrent = scanning_config.get('max_concurrent', 150)
-            samples_per_range = scanning_config.get('samples_per_range', 3000)
-            timeout = scanning_config.get('timeout', 1.5)
-        
-        port = scanning_config.get('port', 25565)
-        
-        logger.info(f"⚙️  Scan Configuration:")
-        logger.info(f"   Max Concurrent: {max_concurrent}")
-        logger.info(f"   Timeout: {timeout}s")
-        logger.info(f"   Target Port: {port}")
-        logger.info(f"   Samples/Range: {samples_per_range:,}")
-        
-        # Initialize scanner
-        scanner = MinecraftServerScanner(
-            max_concurrent=max_concurrent, 
-            timeout=timeout,
-            port=port
-        )
-        
-        # Update scanner config from file
-        scanner.save_interval = scanning_config.get('save_interval', 20)
-        scanner.output_file = config.get('output', {}).get('results_file', 'found_servers.json')
-        
-        # Test Discord connection if enabled
-        discord_config = config.get('discord', {})
-        if discord_config.get('enable_logging', True):
-            logger.info("🔗 Testing Discord connection...")
-            discord_ok = await test_discord_connection(scanner.discord)
-            if not discord_ok:
-                logger.warning("Discord logging disabled due to connection failure")
-        
-        # Pre-scan system check
-        logger.info("🔍 Pre-scan system check...")
-        initial_stats = scanner.system_monitor.get_system_stats()
-        logger.info(f"   Initial CPU: {initial_stats.cpu_percent:.1f}%")
-        logger.info(f"   Initial RAM: {initial_stats.memory_percent:.1f}%")
-        
-        if initial_stats.cpu_percent > 80:
-            logger.warning("⚠️  High CPU usage detected, reducing concurrency...")
-            max_concurrent = max(50, max_concurrent // 2)
-            scanner.max_concurrent = max_concurrent
-            scanner.semaphore = asyncio.Semaphore(max_concurrent)
-        
-        if initial_stats.memory_percent > 85:
-            logger.warning("⚠️  High memory usage detected, reducing samples...")
-            samples_per_range = max(1000, samples_per_range // 2)
-        
-        # Final startup message
-        logger.info("🚀 All systems ready - Starting scan...")
-        print(f"\n{'='*80}")
-        print(f"🎯 SCAN STARTING - Target: {samples_per_range * len(scanner.get_target_ip_ranges()):,} IPs")
-        print(f"⚡ Concurrency: {max_concurrent} | Timeout: {timeout}s | Port: {port}")
-        print(f"📁 Results will be saved to: {scanner.output_file}")
-        print(f"{'='*80}\n")
-        
-        # Run the enhanced scan
-        await scanner.run_scan(samples_per_range=samples_per_range)
-        
-        # Post-scan summary
-        print(f"\n{'='*80}")
-        print("🏁 SCAN COMPLETED SUCCESSFULLY!")
-        print(f"📊 Check your Discord channels and {scanner.output_file} for results")
-        print(f"📋 Detailed logs saved in logs/ directory")
-        print(f"{'='*80}")
-        
-    except KeyboardInterrupt:
-        print("\n\n🛑 Scan interrupted by user (Ctrl+C)")
-        logger.info("👋 Scan interrupted by user")
-        print("📁 Partial results may be saved in found_servers.json")
-        
-    except Exception as e:
-        logger.error(f"💥 Fatal error occurred: {e}")
-        logger.error(f"📋 Full traceback:\n{traceback.format_exc()}")
-        print(f"\n❌ Fatal error: {e}")
-        print("📋 Check logs/errors.log for detailed error information")
-        
-    finally:
-        logger.info("🔄 Performing final cleanup...")
-        
-        # Final cleanup and resource management
-        try:
-            # Cancel any remaining tasks
-            pending_tasks = [task for task in asyncio.all_tasks() if not task.done()]
-            if pending_tasks:
-                logger.info(f"🧹 Cancelling {len(pending_tasks)} pending tasks...")
-                for task in pending_tasks:
-                    task.cancel()
-                
-                # Wait for tasks to cancel
-                await asyncio.gather(*pending_tasks, return_exceptions=True)
-            
-            # Force garbage collection
-            import gc
-            gc.collect()
-            
-            logger.info("✅ Cleanup completed successfully")
-            
-        except Exception as cleanup_error:
-            logger.error(f"❌ Error during cleanup: {cleanup_error}")
-        
-        print("\n👋 Thank you for using IP-Scourge Enhanced!")
-        print("⭐ If you found this useful, consider starring the GitHub repo!")
-
-if __name__ == '__main__':
-    # Windows compatibility
-    if sys.platform == 'win32':
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    
-    # Set up signal handlers for graceful shutdown
-    import signal
-    
-    def signal_handler(sig, frame):
-        print("\n🛑 Shutdown signal received...")
-        logger.info(f"Received signal {sig}, initiating graceful shutdown...")
-        # The KeyboardInterrupt will be handled by the main try/except
-        raise KeyboardInterrupt
-    
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-    
-    # Run the enhanced scanner
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        pass  # Already handled in main()
-    except Exception as e:
-        print(f"\n💥 Unhandled error: {e}")
-        logging.shutdown()
-        if writer:
+            if writer:
                 try:
                     writer.close()
                     await writer.wait_closed()
@@ -1015,46 +738,280 @@ if __name__ == '__main__':
             # Force garbage collection
             gc.collect()
 
-async def main():
-    """Main execution function"""
+
+def print_banner():
+    """Print startup banner"""
+    banner = """
+╔═══════════════════════════════════════════════════════════════╗
+║                     IP-SCOURGE ENHANCED                      ║
+║               High-Performance Minecraft Scanner             ║
+║                    With System Monitoring                    ║
+╠═══════════════════════════════════════════════════════════════╣
+║  GitHub: https://github.com/PanicAtTheKernl/IP-Scourge      ║
+║  License: MIT                                                ║
+╚═══════════════════════════════════════════════════════════════╝
+    """
+    print(banner)
+    logger.info("IP-Scourge Enhanced initialized")
+
+
+def check_dependencies():
+    """Check if all required dependencies are installed"""
+    required_modules = ['psutil', 'aiohttp']
+    missing = []
+    
+    for module in required_modules:
+        try:
+            __import__(module)
+        except ImportError:
+            missing.append(module)
+    
+    if missing:
+        logger.error(f"Missing required modules: {', '.join(missing)}")
+        logger.error("Please install with: pip install " + " ".join(missing))
+        sys.exit(1)
+    
+    logger.info("✅ All dependencies satisfied")
+
+
+def setup_directories():
+    """Create necessary directories"""
+    directories = ['logs', 'backups', 'results']
+    for directory in directories:
+        os.makedirs(directory, exist_ok=True)
+        logger.debug(f"Directory ensured: {directory}/")
+
+
+async def test_discord_connection(discord_logger):
+    """Test Discord bot connection"""
     try:
+        await discord_logger.send_log("🧪 **Connection Test** - IP-Scourge Enhanced is online!")
+        logger.info("✅ Discord connection test successful")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Discord connection failed: {e}")
+        logger.warning("Continuing without Discord logging...")
+        return False
+
+
+class ConfigManager:
+    """Configuration management class"""
+    def __init__(self):
+        self.config_file = "config.json"
+        self.default_config = {
+            "scanning": {
+                "max_concurrent": 250,
+                "timeout": 1.2,
+                "port": 25565,
+                "samples_per_range": 5000,
+                "save_interval": 20
+            },
+            "discord": {
+                "enable_logging": True,
+                "results_channel_id": DISCORD_CHANNEL_ID,
+                "log_channel_id": DISCORD_LOG_CHANNEL_ID,
+                "bot_token": DISCORD_BOT_TOKEN
+            },
+            "monitoring": {
+                "system_stats_interval": 30,
+                "progress_report_interval": 60,
+                "enable_terminal_stats": True
+            },
+            "output": {
+                "results_file": "found_servers.json",
+                "backup_results": True,
+                "log_level": "INFO"
+            }
+        }
+    
+    def load_config(self):
+        """Load configuration from file or create default"""
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r') as f:
+                    config = json.load(f)
+                logger.info(f"Configuration loaded from {self.config_file}")
+                return config
+            else:
+                self.save_config(self.default_config)
+                logger.info(f"Default configuration created at {self.config_file}")
+                return self.default_config
+        except Exception as e:
+            logger.error(f"Error loading config: {e}")
+            return self.default_config
+    
+    def save_config(self, config):
+        """Save configuration to file"""
+        try:
+            with open(self.config_file, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"Error saving config: {e}")
+
+
+async def main():
+    """Main execution function with enhanced startup"""
+    try:
+        # Print banner and setup
+        print_banner()
+        check_dependencies()
+        setup_directories()
+        
+        # Load configuration
+        config_manager = ConfigManager()
+        config = config_manager.load_config()
+        
         logger.info("🎮 IP-Scourge Enhanced - Starting up...")
         
-        # Optimized settings based on system capabilities
+        # System information
         cpu_count = psutil.cpu_count()
         memory_gb = psutil.virtual_memory().total / (1024**3)
+        disk_free_gb = psutil.disk_usage('.').free / (1024**3)
         
-        # Auto-tune concurrency based on system specs
+        logger.info(f"💻 System Information:")
+        logger.info(f"   CPU Cores: {cpu_count}")
+        logger.info(f"   Total RAM: {memory_gb:.1f}GB")
+        logger.info(f"   Free Disk: {disk_free_gb:.1f}GB")
+        
+        # Auto-tune settings based on system specs and config
+        scanning_config = config.get('scanning', {})
+        
         if memory_gb >= 16 and cpu_count >= 8:
-            max_concurrent = 300
-            samples_per_range = 6000
+            max_concurrent = scanning_config.get('max_concurrent', 1000)
+            samples_per_range = scanning_config.get('samples_per_range', 6000)
+            timeout = scanning_config.get('timeout', 1.0)
         elif memory_gb >= 8 and cpu_count >= 4:
-            max_concurrent = 200
-            samples_per_range = 4000
+            max_concurrent = scanning_config.get('max_concurrent', 500)
+            samples_per_range = scanning_config.get('samples_per_range', 4000)
+            timeout = scanning_config.get('timeout', 1.2)
         else:
-            max_concurrent = 150
-            samples_per_range = 3000
+            max_concurrent = scanning_config.get('max_concurrent', 250)
+            samples_per_range = scanning_config.get('samples_per_range', 3000)
+            timeout = scanning_config.get('timeout', 1.5)
         
-        logger.info(f"💻 System: {cpu_count} cores, {memory_gb:.1f}GB RAM")
-        logger.info(f"⚙️  Auto-tuned: {max_concurrent} concurrent, {samples_per_range} samples/range")
+        port = scanning_config.get('port', 25565)
         
+        logger.info(f"⚙️  Scan Configuration:")
+        logger.info(f"   Max Concurrent: {max_concurrent}")
+        logger.info(f"   Timeout: {timeout}s")
+        logger.info(f"   Target Port: {port}")
+        logger.info(f"   Samples/Range: {samples_per_range:,}")
+        
+        # Initialize scanner
         scanner = MinecraftServerScanner(
             max_concurrent=max_concurrent, 
-            timeout=1.2,
-            port=25565
+            timeout=timeout,
+            port=port
         )
         
+        # Update scanner config from file
+        scanner.save_interval = scanning_config.get('save_interval', 20)
+        scanner.output_file = config.get('output', {}).get('results_file', 'found_servers.json')
+        
+        # Test Discord connection if enabled
+        discord_config = config.get('discord', {})
+        if discord_config.get('enable_logging', True):
+            logger.info("🔗 Testing Discord connection...")
+            discord_ok = await test_discord_connection(scanner.discord)
+            if not discord_ok:
+                logger.warning("Discord logging disabled due to connection failure")
+        
+        # Pre-scan system check
+        logger.info("🔍 Pre-scan system check...")
+        initial_stats = scanner.system_monitor.get_system_stats()
+        logger.info(f"   Initial CPU: {initial_stats.cpu_percent:.1f}%")
+        logger.info(f"   Initial RAM: {initial_stats.memory_percent:.1f}%")
+        
+        if initial_stats.cpu_percent > 80:
+            logger.warning("⚠️  High CPU usage detected, reducing concurrency...")
+            max_concurrent = max(50, max_concurrent // 2)
+            scanner.max_concurrent = max_concurrent
+            scanner.semaphore = asyncio.Semaphore(max_concurrent)
+        
+        if initial_stats.memory_percent > 85:
+            logger.warning("⚠️  High memory usage detected, reducing samples...")
+            samples_per_range = max(1000, samples_per_range // 2)
+        
+        # Final startup message
+        logger.info("🚀 All systems ready - Starting scan...")
+        print(f"\n{'='*80}")
+        print(f"🎯 SCAN STARTING - Target: {samples_per_range * len(scanner.get_target_ip_ranges()):,} IPs")
+        print(f"⚡ Concurrency: {max_concurrent} | Timeout: {timeout}s | Port: {port}")
+        print(f"📁 Results will be saved to: {scanner.output_file}")
+        print(f"{'='*80}\n")
+        
+        # Run the enhanced scan
         await scanner.run_scan(samples_per_range=samples_per_range)
         
+        # Post-scan summary
+        print(f"\n{'='*80}")
+        print("🏁 SCAN COMPLETED SUCCESSFULLY!")
+        print(f"📊 Check your Discord channels and {scanner.output_file} for results")
+        print(f"📋 Detailed logs saved in logs/ directory")
+        print(f"{'='*80}")
+        
     except KeyboardInterrupt:
+        print("\n\n🛑 Scan interrupted by user (Ctrl+C)")
         logger.info("👋 Scan interrupted by user")
+        print("📁 Partial results may be saved in found_servers.json")
+        
     except Exception as e:
-        logger.error(f"Fatal error: {e}")
+        logger.error(f"💥 Fatal error occurred: {e}")
+        logger.error(f"📋 Full traceback:\n{traceback.format_exc()}")
+        print(f"\n❌ Fatal error: {e}")
+        print("📋 Check logs/errors.log for detailed error information")
+        
+    finally:
+        logger.info("🔄 Performing final cleanup...")
+        
+        # Final cleanup and resource management
+        try:
+            # Cancel any remaining tasks
+            pending_tasks = [task for task in asyncio.all_tasks() if not task.done()]
+            if pending_tasks:
+                logger.info(f"🧹 Cancelling {len(pending_tasks)} pending tasks...")
+                for task in pending_tasks:
+                    task.cancel()
+                
+                # Wait for tasks to cancel
+                await asyncio.gather(*pending_tasks, return_exceptions=True)
+            
+            # Force garbage collection
+            gc.collect()
+            
+            logger.info("✅ Cleanup completed successfully")
+            
+        except Exception as cleanup_error:
+            logger.error(f"❌ Error during cleanup: {cleanup_error}")
+        
+        print("\n👋 Thank you for using IP-Scourge Enhanced!")
+        print("⭐ If you found this useful, consider starring the GitHub repo!")
+
+
+def signal_handler(sig, frame):
+    """Handle shutdown signals gracefully"""
+    print("\n🛑 Shutdown signal received...")
+    logger.info(f"Received signal {sig}, initiating graceful shutdown...")
+    raise KeyboardInterrupt
+
+
+if __name__ == '__main__':
+    # Windows compatibility
+    if sys.platform == 'win32':
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    
+    # Set up signal handlers for graceful shutdown
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
+    # Run the enhanced scanner
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass  # Already handled in main()
+    except Exception as e:
+        print(f"\n💥 Unhandled error: {e}")
+        logger.error(f"Unhandled exception: {e}")
         logger.error(traceback.format_exc())
     finally:
-            if writer:
-                try:
-                    writer.close()
-                    await writer.wait_closed()
-                except Exception as e:
-                    logger.debug(f"Error closing connection to {ip}: {e}")
+        logging.shutdown()
